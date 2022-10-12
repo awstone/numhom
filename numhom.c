@@ -1,7 +1,7 @@
 #include <petscsys.h>
 #include <petscdmplex.h>
 #include <petscds.h>
-
+#include <petscsnes.h>
 
 /* exact solution to the oscillatory problem */
 static PetscErrorCode oscillatory_u
@@ -56,32 +56,33 @@ static void g3_oscillatory_uu
   g3[0] = 1. / (2. + PetscCosReal(2.*PETSC_PI*x[0]/eps));
 }
 
-int main(int argc; char **argv) {
-  DM                    dmc, dmf;      /* problem specification coarse, fine */
-  DS                    dsc, dsf;      /* discrete system coarse, fine */
-  SNES                  snesc, snesf;  /* nonlinear solver coarse, fine */
-  Vec                   uc, uf;        /* solution coarse, fine */
-  PetscBool             simplex;       /* is the first cell in dmplex a simplex */
-  PetscInt              dimc, dimf;    /* dimension of dm coarse, fine */
-  const PetscInt        id = 1;        /* values for constrained points */
-  PetscFE               fe;            /* manages finite element space */
+int main(int argc, char **argv) {
+  DM                    dmc, dmf;       /* problem specification coarse, fine */
+  PetscDS               dsc, dsf;       /* discrete system coarse, fine */
+  SNES                  snesc, snesf;   /* nonlinear solver coarse, fine */
+  Vec                   uc, uf;         /* solution coarse, fine */
+  PetscBool             simplex;        /* is the first cell in dmplex a simplex */
+  PetscInt              dimc, dimf;     /* dimension of dm coarse, fine */
+  const PetscInt        id = 1;         /* values for constrained points */
+  PetscFE               fe;             /* manages finite element space */
+  DMLabel               label;          /* label */
 
   /* initialize petsc */
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
   
   /* setup mesh coarse */
-  PetscCall(DMCreate(MPI_COMM_WORLD, dmc));
-  PetscCall(DMSetOptionsPrefix(*dmc, "coarse_"));
-  PetscCall(DMSetType(*dmc, DMPLEX));
-  PetscCall(DMSetFromOptions(*dmc));
-  PetscCall(DMViewFromOptions(*dmc, NULL, "-dmc_view"));
+  PetscCall(DMCreate(MPI_COMM_WORLD, &dmc));
+  PetscCall(DMSetOptionsPrefix(dmc, "coarse_"));
+  PetscCall(DMSetType(dmc, DMPLEX));
+  PetscCall(DMSetFromOptions(dmc));
+  PetscCall(DMViewFromOptions(dmc, NULL, "-dmc_view"));
   
   /* setup mesh fine */
-  PetscCall(DMCreate(MPI_COMM_WORLD, dmf));
-  PetscCall(DMSetOptionsPrefix(*dmf, "fine_"));
-  PetscCall(DMSetType(*dmf, DMPLEX));
-  PetscCall(DMSetFromOptions(*dmf));
-  PetscCall(DMViewFromOptions(*dmf, NULL, "-dmf_view"));
+  PetscCall(DMCreate(MPI_COMM_WORLD, &dmf));
+  PetscCall(DMSetOptionsPrefix(dmf, "fine_"));
+  PetscCall(DMSetType(dmf, DMPLEX));
+  PetscCall(DMSetFromOptions(dmf));
+  PetscCall(DMViewFromOptions(dmf, NULL, "-dmf_view"));
   
   /* setup snes coarse */
   PetscCall(SNESCreate(PETSC_COMM_WORLD, &snesc));
@@ -108,33 +109,36 @@ int main(int argc; char **argv) {
   PetscCall(PetscFEDestroy(&fe));
 
   /* setup problem coarse */
+  PetscCall(DMGetDS(dmc, &dsc));
   PetscCall(PetscDSSetResidual(dsc, 0, f0_oscillatory_u, f1_oscillatory_u));
   PetscCall(PetscDSSetJacobian(dsc, 0, 0, NULL, NULL, NULL, g3_oscillatory_uu));
   PetscCall(PetscDSSetExactSolution(dsc, 0, oscillatory_u, NULL));
   PetscCall(DMGetLabel(dmc, "marker", &label));
   PetscCall(DMAddBoundary(dmc, DM_BC_ESSENTIAL, "wall", label, 1, &id, 0, 0,
-			  NULL, (void, (*)(void)) oscillatory_u, NULL, NULL, NULL));
+			  NULL, (void (*)(void)) oscillatory_u, NULL, NULL, NULL));
 
   /* setup problem fine */
+  PetscCall(DMGetDS(dmf, &dsf));
   PetscCall(PetscDSSetResidual(dsf, 0, f0_oscillatory_u, f1_oscillatory_u));
   PetscCall(PetscDSSetJacobian(dsf, 0, 0, NULL, NULL, NULL, g3_oscillatory_uu));
   PetscCall(PetscDSSetExactSolution(dsf, 0, oscillatory_u, NULL));
   PetscCall(DMGetLabel(dmf, "marker", &label));
   PetscCall(DMAddBoundary(dmf, DM_BC_ESSENTIAL, "wall", label, 1, &id, 0, 0,
-			  NULL, (void, (*)(void)) oscillatory_u, NULL, NULL, NULL));
+			  NULL, (void (*)(void)) oscillatory_u, NULL, NULL, NULL));
 
   /* solve problem coarse */
   PetscCall(DMCreateGlobalVector(dmc, &uc));
   PetscCall(VecSet(uc, 0.0));
   PetscCall(DMPlexSetSNESLocalFEM(dmc, NULL, NULL, NULL));
   PetscCall(SNESSolve(snesc, NULL, uc));
+  PetscCall(SNESGetSolution(snesc, &uc));
 
   /* solve problem fine */
   PetscCall(DMCreateGlobalVector(dmf, &uf));
   PetscCall(VecSet(uf, 0.0));
   PetscCall(DMPlexSetSNESLocalFEM(dmf, NULL, NULL, NULL));
   PetscCall(SNESSolve(snesf, NULL, uf));
-
+  PetscCall(SNESGetSolution(snesf, &uf));
   /* show solutions */
   PetscCall(VecView(uc, NULL));
   PetscCall(VecView(uf, NULL));
