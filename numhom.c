@@ -67,6 +67,16 @@ static PetscErrorCode SetupMesh(const char prefix[], DM *dm) {
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode SetupSNES(const char prefix[], DM *dm, SNES *snes) {
+
+  PetscFunctionBeginUser;
+  PetscCall(SNESCreate(PETSC_COMM_WORLD, snes));
+  PetscCall(SNESSetDM(*snes, *dm));
+  PetscCall(SNESSetOptionsPrefix(*snes, prefix));
+  PetscCall(SNESSetFromOptions(*snes));
+  PetscFunctionReturn(0);
+}
+
 int main(int argc, char **argv) {
   DM                    dmc, dmf;       /* problem specification coarse, fine */
   PetscDS               dsc, dsf;       /* discrete system coarse, fine */
@@ -88,16 +98,10 @@ int main(int argc, char **argv) {
   PetscCall(SetupMesh("fine_", &dmf));
   
   /* setup snes coarse */
-  PetscCall(SNESCreate(PETSC_COMM_WORLD, &snesc));
-  PetscCall(SNESSetDM(snesc, dmc));
-  PetscCall(SNESSetOptionsPrefix(snesc, "coarse_"));
-  PetscCall(SNESSetFromOptions(snesc));
+  PetscCall(SetupSNES("coarse_", &dmc, &snesc));
 
   /* setup sens fine */
-  PetscCall(SNESCreate(PETSC_COMM_WORLD, &snesf));
-  PetscCall(SNESSetDM(snesf, dmf));
-  PetscCall(SNESSetOptionsPrefix(snesf, "fine_"));
-  PetscCall(SNESSetFromOptions(snesf));
+  PetscCall(SetupSNES("fine_", &dmf, &snesf));
 
   /* setup discretization coarse */
   PetscCall(DMGetDimension(dmc, &dimc));
