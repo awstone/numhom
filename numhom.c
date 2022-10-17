@@ -56,6 +56,17 @@ static void g3_oscillatory_uu
   g3[0] = 1. / (2. + PetscCosReal(2.*PETSC_PI*x[0]/eps));
 }
 
+static PetscErrorCode SetupMesh(const char prefix[], DM *dm) {
+
+  PetscFunctionBeginUser;
+  PetscCall(DMCreate(MPI_COMM_WORLD, dm));
+  PetscCall(DMSetOptionsPrefix(*dm, prefix));
+  PetscCall(DMSetType(*dm, DMPLEX));
+  PetscCall(DMSetFromOptions(*dm));
+  PetscCall(DMViewFromOptions(*dm, NULL, "-dm_view"));
+  PetscFunctionReturn(0);
+}
+
 int main(int argc, char **argv) {
   DM                    dmc, dmf;       /* problem specification coarse, fine */
   PetscDS               dsc, dsf;       /* discrete system coarse, fine */
@@ -71,26 +82,22 @@ int main(int argc, char **argv) {
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
   
   /* setup mesh coarse */
-  PetscCall(DMCreate(MPI_COMM_WORLD, &dmc));
-  PetscCall(DMSetOptionsPrefix(dmc, "coarse_"));
-  PetscCall(DMSetType(dmc, DMPLEX));
-  PetscCall(DMSetFromOptions(dmc));
-  PetscCall(DMViewFromOptions(dmc, NULL, "-dmc_view"));
+  PetscCall(SetupMesh("coarse_", &dmc));
   
   /* setup mesh fine */
-  PetscCall(DMCreate(MPI_COMM_WORLD, &dmf));
-  PetscCall(DMSetOptionsPrefix(dmf, "fine_"));
-  PetscCall(DMSetType(dmf, DMPLEX));
-  PetscCall(DMSetFromOptions(dmf));
-  PetscCall(DMViewFromOptions(dmf, NULL, "-dmf_view"));
+  PetscCall(SetupMesh("fine_", &dmf));
   
   /* setup snes coarse */
   PetscCall(SNESCreate(PETSC_COMM_WORLD, &snesc));
   PetscCall(SNESSetDM(snesc, dmc));
+  PetscCall(SNESSetOptionsPrefix(snesc, "coarse_"));
+  PetscCall(SNESSetFromOptions(snesc));
 
   /* setup sens fine */
   PetscCall(SNESCreate(PETSC_COMM_WORLD, &snesf));
   PetscCall(SNESSetDM(snesf, dmf));
+  PetscCall(SNESSetOptionsPrefix(snesf, "fine_"));
+  PetscCall(SNESSetFromOptions(snesf));
 
   /* setup discretization coarse */
   PetscCall(DMGetDimension(dmc, &dimc));
@@ -131,6 +138,7 @@ int main(int argc, char **argv) {
   PetscCall(VecSet(uc, 0.0));
   PetscCall(DMPlexSetSNESLocalFEM(dmc, NULL, NULL, NULL));
   PetscCall(SNESSolve(snesc, NULL, uc));
+  //  PetscCall(SNESView(snesc, NULL));
   PetscCall(SNESGetSolution(snesc, &uc));
 
   /* solve problem fine */
@@ -138,15 +146,22 @@ int main(int argc, char **argv) {
   PetscCall(VecSet(uf, 0.0));
   PetscCall(DMPlexSetSNESLocalFEM(dmf, NULL, NULL, NULL));
   PetscCall(SNESSolve(snesf, NULL, uf));
+  //d  PetscCall(SNESView(snesf, NULL));
   PetscCall(SNESGetSolution(snesf, &uf));
-  /* show solutions */
-  PetscCall(VecView(uc, NULL));
-  PetscCall(VecView(uf, NULL));
 
-  /* finalize petsc */
+  /* show solutions */
+  PetscCall(VecViewFromOptions(uc, NULL, "-uc_view"));
+  PetscCall(VecViewFromOptions(uf, NULL, "-uf_view"));
+
+  /* clean up */
+  PetscCall(DMDestroy(&dmc));
+  PetscCall(DMDestroy(&dmf));
+  PetscCall(SNESDestroy(&snesc));
+  PetscCall(SNESDestroy(&snesf));
+  PetscCall(VecDestroy(&uc));
+  PetscCall(VecDestroy(&uf));
   PetscCall(PetscFinalize());
   
   return 0;
 }
-
 
