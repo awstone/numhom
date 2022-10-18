@@ -92,13 +92,26 @@ static PetscErrorCode SetupDiscretization(DM *dm) {
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode SetupProblem(DM *dm, PetscDS *ds) {
+  DMLabel         label;  /* label (?) */
+  const PetscInt  id = 1; /* values for constrained points */
+  
+  PetscFunctionBeginUser;
+  PetscCall(DMGetDS(*dm, ds));
+  PetscCall(PetscDSSetResidual(*ds, 0, f0_oscillatory_u, f1_oscillatory_u));
+  PetscCall(PetscDSSetJacobian(*ds, 0, 0, NULL, NULL, NULL, g3_oscillatory_uu));
+  PetscCall(PetscDSSetExactSolution(*ds, 0, oscillatory_u, NULL));
+  PetscCall(DMGetLabel(*dm, "marker", &label));
+  PetscCall(DMAddBoundary(*dm, DM_BC_ESSENTIAL, "wall", label, 1, &id, 0, 0,
+			  NULL, (void (*)(void)) oscillatory_u, NULL, NULL, NULL));
+  PetscFunctionReturn(0);
+}
+
 int main(int argc, char **argv) {
   DM                    dmc, dmf;       /* problem specification coarse, fine */
   PetscDS               dsc, dsf;       /* discrete system coarse, fine */
   SNES                  snesc, snesf;   /* nonlinear solver coarse, fine */
   Vec                   uc, uf;         /* solution coarse, fine */
-  const PetscInt        id = 1;         /* values for constrained points */
-  DMLabel               label;          /* label */
 
   /* initialize petsc */
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
@@ -114,24 +127,10 @@ int main(int argc, char **argv) {
   PetscCall(SetupDiscretization(&dmc));
   /* setup discretization fine */
   PetscCall(SetupDiscretization(&dmf));
-
   /* setup problem coarse */
-  PetscCall(DMGetDS(dmc, &dsc));
-  PetscCall(PetscDSSetResidual(dsc, 0, f0_oscillatory_u, f1_oscillatory_u));
-  PetscCall(PetscDSSetJacobian(dsc, 0, 0, NULL, NULL, NULL, g3_oscillatory_uu));
-  PetscCall(PetscDSSetExactSolution(dsc, 0, oscillatory_u, NULL));
-  PetscCall(DMGetLabel(dmc, "marker", &label));
-  PetscCall(DMAddBoundary(dmc, DM_BC_ESSENTIAL, "wall", label, 1, &id, 0, 0,
-			  NULL, (void (*)(void)) oscillatory_u, NULL, NULL, NULL));
-
+  PetscCall(SetupProblem(&dmc, &dsc));
   /* setup problem fine */
-  PetscCall(DMGetDS(dmf, &dsf));
-  PetscCall(PetscDSSetResidual(dsf, 0, f0_oscillatory_u, f1_oscillatory_u));
-  PetscCall(PetscDSSetJacobian(dsf, 0, 0, NULL, NULL, NULL, g3_oscillatory_uu));
-  PetscCall(PetscDSSetExactSolution(dsf, 0, oscillatory_u, NULL));
-  PetscCall(DMGetLabel(dmf, "marker", &label));
-  PetscCall(DMAddBoundary(dmf, DM_BC_ESSENTIAL, "wall", label, 1, &id, 0, 0,
-			  NULL, (void (*)(void)) oscillatory_u, NULL, NULL, NULL));
+  PetscCall(SetupProblem(&dmf, &dsf));
 
   /* solve problem coarse */
   PetscCall(DMCreateGlobalVector(dmc, &uc));
