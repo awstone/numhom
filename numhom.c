@@ -107,6 +107,17 @@ static PetscErrorCode SetupProblem(DM *dm, PetscDS *ds) {
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode SolveProblem(DM *dm, SNES *snes, Vec *u) {
+  
+  PetscFunctionBeginUser;
+  PetscCall(DMCreateGlobalVector(*dm, u));
+  PetscCall(VecSet(*u, 0.0));
+  PetscCall(DMPlexSetSNESLocalFEM(*dm, NULL, NULL, NULL));
+  PetscCall(SNESSolve(*snes, NULL, *u));
+  PetscCall(SNESGetSolution(*snes, u));
+  PetscFunctionReturn(0);
+}
+
 int main(int argc, char **argv) {
   DM                    dmc, dmf;       /* problem specification coarse, fine */
   PetscDS               dsc, dsf;       /* discrete system coarse, fine */
@@ -133,20 +144,22 @@ int main(int argc, char **argv) {
   PetscCall(SetupProblem(&dmf, &dsf));
 
   /* solve problem coarse */
-  PetscCall(DMCreateGlobalVector(dmc, &uc));
-  PetscCall(VecSet(uc, 0.0));
-  PetscCall(DMPlexSetSNESLocalFEM(dmc, NULL, NULL, NULL));
-  PetscCall(SNESSolve(snesc, NULL, uc));
-  //  PetscCall(SNESView(snesc, NULL));
-  PetscCall(SNESGetSolution(snesc, &uc));
+  PetscCall(SolveProblem(&dmc, &snesc, &uc));
+  /* PetscCall(DMCreateGlobalVector(dmc, &uc)); */
+  /* PetscCall(VecSet(uc, 0.0)); */
+  /* PetscCall(DMPlexSetSNESLocalFEM(dmc, NULL, NULL, NULL)); */
+  /* PetscCall(SNESSolve(snesc, NULL, uc)); */
+  /* //  PetscCall(SNESView(snesc, NULL)); */
+  /* PetscCall(SNESGetSolution(snesc, &uc)); */
 
   /* solve problem fine */
-  PetscCall(DMCreateGlobalVector(dmf, &uf));
-  PetscCall(VecSet(uf, 0.0));
-  PetscCall(DMPlexSetSNESLocalFEM(dmf, NULL, NULL, NULL));
-  PetscCall(SNESSolve(snesf, NULL, uf));
-  //d  PetscCall(SNESView(snesf, NULL));
-  PetscCall(SNESGetSolution(snesf, &uf));
+  PetscCall(SolveProblem(&dmf, &snesf, &uf));
+  /* PetscCall(DMCreateGlobalVector(dmf, &uf)); */
+  /* PetscCall(VecSet(uf, 0.0)); */
+  /* PetscCall(DMPlexSetSNESLocalFEM(dmf, NULL, NULL, NULL)); */
+  /* PetscCall(SNESSolve(snesf, NULL, uf)); */
+  /* //d  PetscCall(SNESView(snesf, NULL)); */
+  /* PetscCall(SNESGetSolution(snesf, &uf)); */
 
   /* show solutions */
   PetscCall(VecViewFromOptions(uc, NULL, "-uc_view"));
