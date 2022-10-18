@@ -124,48 +124,22 @@ int main(int argc, char **argv) {
   SNES                  snesc, snesf;   /* nonlinear solver coarse, fine */
   Vec                   uc, uf;         /* solution coarse, fine */
 
-  /* initialize petsc */
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
-  /* setup mesh coarse */
   PetscCall(SetupMesh("coarse_", &dmc));
-  /* setup mesh fine */
   PetscCall(SetupMesh("fine_", &dmf));
-  /* setup snes coarse */
   PetscCall(SetupSNES("coarse_", &dmc, &snesc));
-  /* setup sens fine */
   PetscCall(SetupSNES("fine_", &dmf, &snesf));
-  /* setup discretization coarse */
   PetscCall(SetupDiscretization(&dmc));
-  /* setup discretization fine */
   PetscCall(SetupDiscretization(&dmf));
-  /* setup problem coarse */
   PetscCall(SetupProblem(&dmc, &dsc));
-  /* setup problem fine */
   PetscCall(SetupProblem(&dmf, &dsf));
-
-  /* solve problem coarse */
+  
   PetscCall(SolveProblem(&dmc, &snesc, &uc));
-  /* PetscCall(DMCreateGlobalVector(dmc, &uc)); */
-  /* PetscCall(VecSet(uc, 0.0)); */
-  /* PetscCall(DMPlexSetSNESLocalFEM(dmc, NULL, NULL, NULL)); */
-  /* PetscCall(SNESSolve(snesc, NULL, uc)); */
-  /* //  PetscCall(SNESView(snesc, NULL)); */
-  /* PetscCall(SNESGetSolution(snesc, &uc)); */
-
-  /* solve problem fine */
   PetscCall(SolveProblem(&dmf, &snesf, &uf));
-  /* PetscCall(DMCreateGlobalVector(dmf, &uf)); */
-  /* PetscCall(VecSet(uf, 0.0)); */
-  /* PetscCall(DMPlexSetSNESLocalFEM(dmf, NULL, NULL, NULL)); */
-  /* PetscCall(SNESSolve(snesf, NULL, uf)); */
-  /* //d  PetscCall(SNESView(snesf, NULL)); */
-  /* PetscCall(SNESGetSolution(snesf, &uf)); */
 
-  /* show solutions */
   PetscCall(VecViewFromOptions(uc, NULL, "-uc_view"));
   PetscCall(VecViewFromOptions(uf, NULL, "-uf_view"));
 
-  /* clean up */
   PetscCall(DMDestroy(&dmc));
   PetscCall(DMDestroy(&dmf));
   PetscCall(SNESDestroy(&snesc));
