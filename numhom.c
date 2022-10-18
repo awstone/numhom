@@ -77,47 +77,43 @@ static PetscErrorCode SetupSNES(const char prefix[], DM *dm, SNES *snes) {
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode SetupDiscretization(DM *dm) {
+  PetscBool simplex;     /* is the first cell in dmplex a simplex */
+  PetscInt  dim;         /* dimension of the dm */
+  PetscFE   fe;          /* manages finite element space */
+
+  PetscFunctionBeginUser;
+  PetscCall(DMGetDimension(*dm, &dim));
+  PetscCall(DMPlexIsSimplex(*dm, &simplex));
+  PetscCall(PetscFECreateDefault(PETSC_COMM_SELF, dim, 1, simplex, NULL, -1, &fe));
+  PetscCall(DMSetField(*dm, 0, NULL, (PetscObject) fe));
+  PetscCall(DMCreateDS(*dm));
+  PetscCall(PetscFEDestroy(&fe));
+  PetscFunctionReturn(0);
+}
+
 int main(int argc, char **argv) {
   DM                    dmc, dmf;       /* problem specification coarse, fine */
   PetscDS               dsc, dsf;       /* discrete system coarse, fine */
   SNES                  snesc, snesf;   /* nonlinear solver coarse, fine */
   Vec                   uc, uf;         /* solution coarse, fine */
-  PetscBool             simplex;        /* is the first cell in dmplex a simplex */
-  PetscInt              dimc, dimf;     /* dimension of dm coarse, fine */
   const PetscInt        id = 1;         /* values for constrained points */
-  PetscFE               fe;             /* manages finite element space */
   DMLabel               label;          /* label */
 
   /* initialize petsc */
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
-  
   /* setup mesh coarse */
   PetscCall(SetupMesh("coarse_", &dmc));
-  
   /* setup mesh fine */
   PetscCall(SetupMesh("fine_", &dmf));
-  
   /* setup snes coarse */
   PetscCall(SetupSNES("coarse_", &dmc, &snesc));
-
   /* setup sens fine */
   PetscCall(SetupSNES("fine_", &dmf, &snesf));
-
   /* setup discretization coarse */
-  PetscCall(DMGetDimension(dmc, &dimc));
-  PetscCall(DMPlexIsSimplex(dmc, &simplex));
-  PetscCall(PetscFECreateDefault(PETSC_COMM_SELF, dimc, 1, simplex, NULL, -1, &fe));
-  PetscCall(DMSetField(dmc, 0, NULL, (PetscObject) fe));
-  PetscCall(DMCreateDS(dmc));
-  PetscCall(PetscFEDestroy(&fe));
-
+  PetscCall(SetupDiscretization(&dmc));
   /* setup discretization fine */
-  PetscCall(DMGetDimension(dmf, &dimf));
-  PetscCall(DMPlexIsSimplex(dmf, &simplex));
-  PetscCall(PetscFECreateDefault(PETSC_COMM_SELF, dimf, 1, simplex, NULL, -1, &fe));
-  PetscCall(DMSetField(dmf, 0, NULL, (PetscObject) fe));
-  PetscCall(DMCreateDS(dmf));
-  PetscCall(PetscFEDestroy(&fe));
+  PetscCall(SetupDiscretization(&dmf));
 
   /* setup problem coarse */
   PetscCall(DMGetDS(dmc, &dsc));
