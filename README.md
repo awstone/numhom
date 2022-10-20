@@ -1,4 +1,5 @@
-# numhom
+# Numerical Homogenization (Work in Progress)
+
 Numerical Homogenization of Partial Differential Equations
 
 ### Example usage:
