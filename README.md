@@ -1,4 +1,4 @@
-# Numerical Homogenization (Work in Progress)
+# Numerical Homogenization (WIP)
 
 Numerical Homogenization of Partial Differential Equations
 
