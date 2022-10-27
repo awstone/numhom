@@ -154,14 +154,14 @@ int main(int argc, char **argv) {
   PetscCall(PetscViewerSetType(viewer, PETSCVIEWERDRAW));
 
   /* compare solutions coarse */ 
-  /* PetscCall(DMGetGlobalVector(dmc, &exactc)); */
-  /* PetscCall(DMGetLocalVector(dmc, &luc)); */
-  /* PetscCall(DMComputeExactSolution(dmc, 0.0, exactc, NULL)); */
-  /* PetscCall(DMGlobalToLocalBegin(dmc, uc, INSERT_VALUES, luc)); */
-  /* PetscCall(DMGlobalToLocalEnd(dmc, uc, INSERT_VALUES, luc)); */
-  /* PetscCall(DMPlexInsertBoundaryValues(dmc, PETSC_TRUE, luc, 0., NULL, NULL, NULL)); */
-  /* PetscCall(DMPlexVecView1D(dmc, 1, &luc, viewer)); */
-  /* PetscCall(DMRestoreGlobalVector(dmc, &exactc)); */
+  PetscCall(DMGetGlobalVector(dmc, &exactc));
+  PetscCall(DMGetLocalVector(dmc, &luc));
+  PetscCall(DMComputeExactSolution(dmc, 0.0, exactc, NULL));
+  PetscCall(DMGlobalToLocalBegin(dmc, uc, INSERT_VALUES, luc));
+  PetscCall(DMGlobalToLocalEnd(dmc, uc, INSERT_VALUES, luc));
+  PetscCall(DMPlexInsertBoundaryValues(dmc, PETSC_TRUE, luc, 0., NULL, NULL, NULL));
+  PetscCall(DMPlexVecView1D(dmc, 1, &luc, viewer));
+  PetscCall(DMRestoreGlobalVector(dmc, &exactc));
 
   /* compare solutions fine */
   PetscCall(DMGetGlobalVector(dmf, &exactf));
