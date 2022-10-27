@@ -4,7 +4,7 @@ Numerical Homogenization of Partial Differential Equations
 
 ### Example usage:
 
-Solve the same problem at two scales (coarse and fine) and view the solution:
+Solve the same problem at two scales (coarse and fine) and draw the solution:
 
 `make numhom`
 
