@@ -1,3 +1,5 @@
+#include "mpi.h"
+#include "petscviewer.h"
 #include <petscsys.h>
 #include <petscdmplex.h>
 #include <petscds.h>
@@ -122,8 +124,13 @@ int main(int argc, char **argv) {
   DM                    dmc, dmf;       /* problem specification coarse, fine */
   PetscDS               dsc, dsf;       /* discrete system coarse, fine */
   SNES                  snesc, snesf;   /* nonlinear solver coarse, fine */
-  Vec                   uc, uf;         /* solution coarse, fine */
+  Vec                   uc, uf;         /* solution coarse, fine  */
+  Vec                   exactc, exactf; /* exact soln coarse, fine */
+  Vec                   luc, luf;       /* local soln coarse, fine */
+  PetscViewer           viewer;         /* for viewing things */
+  
 
+  /* initialization and setup */
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
   PetscCall(SetupMesh("coarse_", &dmc));
   PetscCall(SetupMesh("fine_", &dmf));
@@ -133,13 +140,40 @@ int main(int argc, char **argv) {
   PetscCall(SetupDiscretization(&dmf));
   PetscCall(SetupProblem(&dmc, &dsc));
   PetscCall(SetupProblem(&dmf, &dsf));
-  
+
+  /* solution */
   PetscCall(SolveProblem(&dmc, &snesc, &uc));
   PetscCall(SolveProblem(&dmf, &snesf, &uf));
 
+  /* view solution */
   PetscCall(VecViewFromOptions(uc, NULL, "-uc_view"));
   PetscCall(VecViewFromOptions(uf, NULL, "-uf_view"));
 
+  /* setup viewer */
+  PetscCall(PetscViewerCreate(MPI_COMM_WORLD, &viewer));
+  PetscCall(PetscViewerSetType(viewer, PETSCVIEWERDRAW));
+
+  /* compare solutions coarse */ 
+  /* PetscCall(DMGetGlobalVector(dmc, &exactc)); */
+  /* PetscCall(DMGetLocalVector(dmc, &luc)); */
+  /* PetscCall(DMComputeExactSolution(dmc, 0.0, exactc, NULL)); */
+  /* PetscCall(DMGlobalToLocalBegin(dmc, uc, INSERT_VALUES, luc)); */
+  /* PetscCall(DMGlobalToLocalEnd(dmc, uc, INSERT_VALUES, luc)); */
+  /* PetscCall(DMPlexInsertBoundaryValues(dmc, PETSC_TRUE, luc, 0., NULL, NULL, NULL)); */
+  /* PetscCall(DMPlexVecView1D(dmc, 1, &luc, viewer)); */
+  /* PetscCall(DMRestoreGlobalVector(dmc, &exactc)); */
+
+  /* compare solutions fine */
+  PetscCall(DMGetGlobalVector(dmf, &exactf));
+  PetscCall(DMGetLocalVector(dmf, &luf));
+  PetscCall(DMComputeExactSolution(dmf, 0.0, exactf, NULL));
+  PetscCall(DMGlobalToLocalBegin(dmf, uf, INSERT_VALUES, luf));
+  PetscCall(DMGlobalToLocalEnd(dmf, uf, INSERT_VALUES, luf));
+  PetscCall(DMPlexInsertBoundaryValues(dmf, PETSC_TRUE, luf, 0., NULL, NULL, NULL));
+  PetscCall(DMPlexVecView1D(dmf, 1, &luf, viewer));
+  PetscCall(DMRestoreGlobalVector(dmf, &exactf));
+
+  PetscCall(PetscViewerDestroy(&viewer));
   PetscCall(DMDestroy(&dmc));
   PetscCall(DMDestroy(&dmf));
   PetscCall(SNESDestroy(&snesc));
