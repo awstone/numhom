@@ -1,4 +1,6 @@
 #include "mpi.h"
+#include "petscdm.h"
+#include "petscsystypes.h"
 #include "petscviewer.h"
 #include <petscsys.h>
 #include <petscdmplex.h>
@@ -120,15 +122,46 @@ static PetscErrorCode SolveProblem(DM *dm, SNES *snes, Vec *u) {
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode DrawSolution(DM *dm, Vec *u) {
+  PetscViewer     viewer;       /* viewer object */
+  Vec             exact;        /* exact soln */
+  Vec             ul, exactl;   /* local */
+  Vec             vecs[2];      /* container for exact and ul */
+  
+  PetscFunctionBeginUser;
+  /* setup viewer */
+  PetscCall(PetscViewerCreate(MPI_COMM_WORLD, &viewer));
+  PetscCall(PetscViewerSetType(viewer, PETSCVIEWERDRAW));
+  /* compute exact solution */
+  PetscCall(DMGetGlobalVector(*dm, &exact));
+  PetscCall(DMComputeExactSolution(*dm, 0.0, exact, NULL));
+  /* add boundary conditions to solution */
+  PetscCall(DMGetLocalVector(*dm, &ul));
+  PetscCall(DMGlobalToLocalBegin(*dm, *u, INSERT_VALUES, ul));
+  PetscCall(DMGlobalToLocalEnd(*dm, *u, INSERT_VALUES, ul));
+  PetscCall(DMPlexInsertBoundaryValues(*dm, PETSC_TRUE, ul, 0., NULL, NULL, NULL));
+  /* add boundary conditions to exact solution */
+  PetscCall(DMGetLocalVector(*dm, &exactl));
+  PetscCall(DMGlobalToLocalBegin(*dm, exact, INSERT_VALUES, exactl));
+  PetscCall(DMGlobalToLocalEnd(*dm, exact, INSERT_VALUES, exactl));
+  PetscCall(DMPlexInsertBoundaryValues(*dm, PETSC_TRUE, exactl, 0., NULL, NULL, NULL));
+  vecs[0] = exactl;
+  vecs[1] = ul;
+  /* plot vectors */
+  PetscCall(DMPlexVecView1D(*dm, 2, vecs, viewer));
+  /* cleanup */
+  PetscCall(DMRestoreLocalVector(*dm, &vecs[0]));
+  PetscCall(DMRestoreLocalVector(*dm, &vecs[1]));
+  PetscCall(DMRestoreGlobalVector(*dm, &exact));
+  PetscCall(PetscViewerDestroy(&viewer));
+  PetscFunctionReturn(0);
+}
+
 int main(int argc, char **argv) {
   DM                    dmc, dmf;       /* problem specification coarse, fine */
   PetscDS               dsc, dsf;       /* discrete system coarse, fine */
   SNES                  snesc, snesf;   /* nonlinear solver coarse, fine */
   Vec                   uc, uf;         /* solution coarse, fine  */
-  Vec                   exactc, exactf; /* exact soln coarse, fine */
-  Vec                   luc, luf;       /* local soln coarse, fine */
-  PetscViewer           viewer;         /* for viewing things */
-  
 
   /* initialization and setup */
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
@@ -145,35 +178,15 @@ int main(int argc, char **argv) {
   PetscCall(SolveProblem(&dmc, &snesc, &uc));
   PetscCall(SolveProblem(&dmf, &snesf, &uf));
 
-  /* view solution */
+  /* print solution */
   PetscCall(VecViewFromOptions(uc, NULL, "-uc_view"));
   PetscCall(VecViewFromOptions(uf, NULL, "-uf_view"));
 
-  /* setup viewer */
-  PetscCall(PetscViewerCreate(MPI_COMM_WORLD, &viewer));
-  PetscCall(PetscViewerSetType(viewer, PETSCVIEWERDRAW));
+  /* draw solution */
+  PetscCall(DrawSolution(&dmc, &uc));
+  PetscCall(DrawSolution(&dmf, &uf));
 
-  /* compare solutions coarse */ 
-  PetscCall(DMGetGlobalVector(dmc, &exactc));
-  PetscCall(DMGetLocalVector(dmc, &luc));
-  PetscCall(DMComputeExactSolution(dmc, 0.0, exactc, NULL));
-  PetscCall(DMGlobalToLocalBegin(dmc, uc, INSERT_VALUES, luc));
-  PetscCall(DMGlobalToLocalEnd(dmc, uc, INSERT_VALUES, luc));
-  PetscCall(DMPlexInsertBoundaryValues(dmc, PETSC_TRUE, luc, 0., NULL, NULL, NULL));
-  PetscCall(DMPlexVecView1D(dmc, 1, &luc, viewer));
-  PetscCall(DMRestoreGlobalVector(dmc, &exactc));
-
-  /* compare solutions fine */
-  PetscCall(DMGetGlobalVector(dmf, &exactf));
-  PetscCall(DMGetLocalVector(dmf, &luf));
-  PetscCall(DMComputeExactSolution(dmf, 0.0, exactf, NULL));
-  PetscCall(DMGlobalToLocalBegin(dmf, uf, INSERT_VALUES, luf));
-  PetscCall(DMGlobalToLocalEnd(dmf, uf, INSERT_VALUES, luf));
-  PetscCall(DMPlexInsertBoundaryValues(dmf, PETSC_TRUE, luf, 0., NULL, NULL, NULL));
-  PetscCall(DMPlexVecView1D(dmf, 1, &luf, viewer));
-  PetscCall(DMRestoreGlobalVector(dmf, &exactf));
-
-  PetscCall(PetscViewerDestroy(&viewer));
+  /* cleanup */
   PetscCall(DMDestroy(&dmc));
   PetscCall(DMDestroy(&dmf));
   PetscCall(SNESDestroy(&snesc));
