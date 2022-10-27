@@ -7,6 +7,7 @@
 #include <petscds.h>
 #include <petscsnes.h>
 
+
 /* exact solution to the oscillatory problem */
 static PetscErrorCode oscillatory_u
 (PetscInt dim, PetscReal time, const PetscReal x[],
