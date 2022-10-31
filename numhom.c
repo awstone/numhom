@@ -191,7 +191,6 @@ int main(int argc, char **argv) {
   PetscCall(DrawSolution(&dmf, &uf));
 
   /* create projection */
-  /* TODO: I think pf needs to be transposed */
   PetscCall(DMCreateMassMatrix(dmc, dmf, &mf));
   PetscCall(DMCreateInterpolation(dmc, dmf, &pf, NULL));
   PetscCall(MatTranspose(pf, MAT_INPLACE_MATRIX, &pf));
@@ -203,6 +202,12 @@ int main(int argc, char **argv) {
   PetscCall(SNESSetJacobian(snesf, af, af, NULL, NULL));
   PetscCall(SNESComputeJacobian(snesf, uf, af, af));
   PetscCall(MatViewFromOptions(af, NULL, "-af_view"));
+
+  /* get stiffness matrix coarse */
+  PetscCall(DMCreateMatrix(dmc, &ac));
+  PetscCall(SNESSetJacobian(snesc, ac, ac, NULL, NULL));
+  PetscCall(SNESComputeJacobian(snesc, uc, ac, ac));
+  PetscCall(MatViewFromOptions(ac, NULL, "-ac_view"));
 
   /* project to stiffness matrix coarse */
   PetscCall(MatMatMult(pf, af, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &pa));
