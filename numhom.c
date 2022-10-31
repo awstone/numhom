@@ -2,6 +2,7 @@
 #include "petscdm.h"
 #include "petscmat.h"
 #include "petscsystypes.h"
+#include "petscvec.h"
 #include "petscviewer.h"
 #include <petscsys.h>
 #include <petscdmplex.h>
@@ -183,8 +184,10 @@ int main(int argc, char **argv) {
   PetscCall(SolveProblem(&dmf, &snesf, &uf));
 
   /* print solution */
-  PetscCall(VecViewFromOptions(uc, NULL, "-uc_view"));
-  PetscCall(VecViewFromOptions(uf, NULL, "-uf_view"));
+  PetscCall(VecSetOptionsPrefix(uc, "uc_"));
+  PetscCall(VecViewFromOptions(uc, NULL, "-vec_view"));
+  PetscCall(VecSetOptionsPrefix(uf, "uf_"));
+  PetscCall(VecViewFromOptions(uf, NULL, "-vec_view"));
 
   /* draw solution */
   PetscCall(DrawSolution(&dmc, &uc));
@@ -194,25 +197,30 @@ int main(int argc, char **argv) {
   PetscCall(DMCreateMassMatrix(dmc, dmf, &mf));
   PetscCall(DMCreateInterpolation(dmc, dmf, &pf, NULL));
   PetscCall(MatTranspose(pf, MAT_INPLACE_MATRIX, &pf));
-  PetscCall(MatViewFromOptions(mf, NULL, "-mf_view"));
-  PetscCall(MatViewFromOptions(pf, NULL, "-pf_view"));
+  PetscCall(MatSetOptionsPrefix(mf, "mf_"));
+  PetscCall(MatViewFromOptions(mf, NULL, "-mat_view"));
+  PetscCall(MatSetOptionsPrefix(pf, "pf_"));
+  PetscCall(MatViewFromOptions(pf, NULL, "-mat_view"));
 
   /* get stiffness matrix fine */
   PetscCall(DMCreateMatrix(dmf, &af));
   PetscCall(SNESSetJacobian(snesf, af, af, NULL, NULL));
   PetscCall(SNESComputeJacobian(snesf, uf, af, af));
-  PetscCall(MatViewFromOptions(af, NULL, "-af_view"));
+  PetscCall(MatSetOptionsPrefix(af, "af_"));
+  PetscCall(MatViewFromOptions(af, NULL, "-mat_view"));
 
   /* get stiffness matrix coarse */
   PetscCall(DMCreateMatrix(dmc, &ac));
   PetscCall(SNESSetJacobian(snesc, ac, ac, NULL, NULL));
   PetscCall(SNESComputeJacobian(snesc, uc, ac, ac));
-  PetscCall(MatViewFromOptions(ac, NULL, "-ac_view"));
+  PetscCall(MatSetOptionsPrefix(ac, "ac_"));
+  PetscCall(MatViewFromOptions(ac, NULL, "-mat_view"));
 
   /* project to stiffness matrix coarse */
   PetscCall(MatMatMult(pf, af, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &pa));
   PetscCall(MatMatTransposeMult(pa, pf, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &papt));
-  PetscCall(MatViewFromOptions(papt, NULL, "-papt_view"));
+  PetscCall(MatSetOptionsPrefix(papt, "papt_"));
+  PetscCall(MatViewFromOptions(papt, NULL, "-mat_view"));
   
   /* cleanup */
   PetscCall(DMDestroy(&dmc));
