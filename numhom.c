@@ -191,8 +191,10 @@ int main(int argc, char **argv) {
   PetscCall(DrawSolution(&dmf, &uf));
 
   /* create projection */
+  /* TODO: I think pf needs to be transposed */
   PetscCall(DMCreateMassMatrix(dmc, dmf, &mf));
   PetscCall(DMCreateInterpolation(dmc, dmf, &pf, NULL));
+  PetscCall(MatTranspose(pf, MAT_INPLACE_MATRIX, &pf));
   PetscCall(MatViewFromOptions(mf, NULL, "-mf_view"));
   PetscCall(MatViewFromOptions(pf, NULL, "-pf_view"));
 
