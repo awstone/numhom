@@ -1,5 +1,6 @@
 #include "mpi.h"
 #include "petscdm.h"
+#include "petscmat.h"
 #include "petscsystypes.h"
 #include "petscviewer.h"
 #include <petscsys.h>
@@ -158,10 +159,13 @@ static PetscErrorCode DrawSolution(DM *dm, Vec *u) {
 }
 
 int main(int argc, char **argv) {
-  DM                    dmc, dmf;       /* problem specification coarse, fine */
-  PetscDS               dsc, dsf;       /* discrete system coarse, fine */
-  SNES                  snesc, snesf;   /* nonlinear solver coarse, fine */
-  Vec                   uc, uf;         /* solution coarse, fine  */
+  DM          dmc, dmf;       /* problem specification coarse, fine */
+  PetscDS     dsc, dsf;       /* discrete system coarse, fine */
+  SNES        snesc, snesf;   /* nonlinear solver coarse, fine */
+  Vec         uc, uf;         /* solution coarse, fine  */
+  Mat         mf, pf;         /* mass matrix, projection matrix fine */
+  Mat         ac, af;         /* stiffness matrix coarse, fine */
+  Mat         pa, papt;     /* matrix products PA, PAP^T */
 
   /* initialization and setup */
   PetscCall(PetscInitialize(&argc, &argv, NULL, NULL));
@@ -186,6 +190,30 @@ int main(int argc, char **argv) {
   PetscCall(DrawSolution(&dmc, &uc));
   PetscCall(DrawSolution(&dmf, &uf));
 
+  /* create projection */
+  PetscCall(DMCreateMassMatrix(dmc, dmf, &mf));
+  PetscCall(DMCreateInterpolation(dmc, dmf, &pf, NULL));
+  PetscCall(MatTranspose(pf, MAT_INPLACE_MATRIX, &pf));
+  PetscCall(MatViewFromOptions(mf, NULL, "-mf_view"));
+  PetscCall(MatViewFromOptions(pf, NULL, "-pf_view"));
+
+  /* get stiffness matrix fine */
+  PetscCall(DMCreateMatrix(dmf, &af));
+  PetscCall(SNESSetJacobian(snesf, af, af, NULL, NULL));
+  PetscCall(SNESComputeJacobian(snesf, uf, af, af));
+  PetscCall(MatViewFromOptions(af, NULL, "-af_view"));
+
+  /* get stiffness matrix coarse */
+  PetscCall(DMCreateMatrix(dmc, &ac));
+  PetscCall(SNESSetJacobian(snesc, ac, ac, NULL, NULL));
+  PetscCall(SNESComputeJacobian(snesc, uc, ac, ac));
+  PetscCall(MatViewFromOptions(ac, NULL, "-ac_view"));
+
+  /* project to stiffness matrix coarse */
+  PetscCall(MatMatMult(pf, af, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &pa));
+  PetscCall(MatMatTransposeMult(pa, pf, MAT_INITIAL_MATRIX, PETSC_DEFAULT, &papt));
+  PetscCall(MatViewFromOptions(papt, NULL, "-papt_view"));
+  
   /* cleanup */
   PetscCall(DMDestroy(&dmc));
   PetscCall(DMDestroy(&dmf));
@@ -193,6 +221,12 @@ int main(int argc, char **argv) {
   PetscCall(SNESDestroy(&snesf));
   PetscCall(VecDestroy(&uc));
   PetscCall(VecDestroy(&uf));
+  PetscCall(MatDestroy(&mf));
+  PetscCall(MatDestroy(&pf));
+  PetscCall(MatDestroy(&ac));
+  PetscCall(MatDestroy(&af));
+  PetscCall(MatDestroy(&pa));
+  PetscCall(MatDestroy(&papt));
   PetscCall(PetscFinalize());
   
   return 0;
